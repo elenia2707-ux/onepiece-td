@@ -1,0 +1,1665 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="나만의 원랜디">
+<title>원피스 랜덤 디펜스 프로토타입</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #151d33;
+    --panel-border: #28365c;
+    --gold: #fbbf24;
+    --gem: #38bdf8;
+    --danger: #ef4444;
+    --mythic: #f59e0b;
+    --trans: #f43f5e;
+  }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html, body {
+    width: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    background: var(--bg);
+    color: #f8fafc;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 상단 HUD */
+  .top-hud {
+    padding-top: calc(env(safe-area-inset-top, 8px) + 6px);
+    padding-bottom: 8px;
+    padding-left: 12px;
+    padding-right: 12px;
+    background: linear-gradient(180deg, #16203a 0%, #0f172a 100%);
+    border-bottom: 1px solid var(--panel-border);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 10;
+  }
+  .hud-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .wave-badge {
+    font-weight: 800;
+    font-size: 15px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .wave-timer {
+    background: #1e293b;
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-size: 13px;
+    color: #94a3b8;
+    font-variant-numeric: tabular-nums;
+  }
+  .enemy-counter {
+    flex: 1;
+    max-width: 155px;
+    background: #1e293b;
+    height: 22px;
+    border-radius: 11px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid #334155;
+  }
+  .enemy-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #22c55e, #eab308, #ef4444);
+    width: 0%;
+    transition: width 0.15s;
+  }
+  .enemy-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    text-shadow: 0 1px 2px #000;
+  }
+  .currencies {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .curr-pill {
+    background: #0b1324;
+    border: 1px solid #2b3b63;
+    border-radius: 8px;
+    padding: 3px 9px;
+    font-size: 13px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .mini-btns {
+    display: flex;
+    gap: 5px;
+  }
+  .mini-btn {
+    background: #1e293b;
+    color: #e2e8f0;
+    border: 1px solid #3b4f7a;
+    border-radius: 7px;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .mini-btn.active {
+    background: #2563eb;
+    border-color: #60a5fa;
+    color: #fff;
+  }
+
+  /* 중앙 게임 영역 */
+  .stage-wrap {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+  }
+
+  /* 즉시 조합 알림 바 */
+  .craft-alert-bar {
+    position: absolute;
+    top: 6px;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    pointer-events: none;
+    z-index: 6;
+  }
+  .craft-chip {
+    pointer-events: auto;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #090d16;
+    border: 2px solid #fef08a;
+    border-radius: 99px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 900;
+    white-space: nowrap;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.5);
+    animation: pulse 1.1s infinite alternate;
+  }
+  @keyframes pulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.04); }
+  }
+
+  /* 선택된 유닛 정보 바 */
+  .unit-inspector {
+    height: 48px;
+    background: #11192e;
+    border-top: 1px solid #243256;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: 12px;
+  }
+  .unit-info-left {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .unit-title {
+    font-weight: 800;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .unit-desc {
+    font-size: 11px;
+    color: #94a3b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .unit-actions {
+    display: flex;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+  .u-btn {
+    border: none;
+    border-radius: 6px;
+    padding: 6px 9px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #fff;
+    background: #334155;
+  }
+  .u-btn.merge { background: #2563eb; }
+  .u-btn.lock { background: #475569; }
+  .u-btn.locked { background: #d97706; }
+  .u-btn.sell { background: #991b1b; }
+
+  /* 하단 컨트롤 패널 */
+  .bottom-panel {
+    background: var(--panel);
+    border-top: 1px solid var(--panel-border);
+    padding: 8px 10px calc(env(safe-area-inset-bottom, 10px) + 8px);
+    display: grid;
+    grid-template-columns: 1.25fr 1fr 1fr;
+    gap: 7px;
+    z-index: 10;
+  }
+  .act-btn {
+    border: 1px solid #3b4e7a;
+    border-radius: 11px;
+    padding: 9px 6px;
+    color: #fff;
+    font-weight: 800;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    position: relative;
+    background: #1e293b;
+  }
+  .act-btn:active { transform: scale(0.96); }
+  .act-btn.summon {
+    grid-row: span 2;
+    background: linear-gradient(160deg, #2563eb, #1d4ed8);
+    border-color: #60a5fa;
+    font-size: 15px;
+  }
+  .act-btn.gamble {
+    background: linear-gradient(160deg, #7c3aed, #5b21b6);
+    border-color: #a78bfa;
+  }
+  .act-btn.bounty {
+    background: linear-gradient(160deg, #be123c, #881337);
+    border-color: #fb7185;
+  }
+  .act-btn.bounty.disabled {
+    opacity: 0.5;
+    background: #1e293b;
+    border-color: #334155;
+  }
+  .act-btn .sub {
+    font-size: 11px;
+    font-weight: 700;
+    opacity: 0.92;
+  }
+  .badge-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #f59e0b;
+    color: #000;
+    font-size: 11px;
+    font-weight: 900;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* 모달 공통 */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 9, 20, 0.82);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 50;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal-box {
+    width: 100%;
+    max-width: 420px;
+    max-height: 80dvh;
+    background: #151e36;
+    border: 1px solid #364978;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .modal-head {
+    padding: 13px 15px;
+    background: #0f172a;
+    border-bottom: 1px solid #263559;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 800;
+    font-size: 15px;
+  }
+  .close-btn {
+    background: #334155;
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    padding: 5px 10px;
+    font-weight: 800;
+  }
+  .modal-body {
+    padding: 12px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+  .recipe-card {
+    background: #0d1426;
+    border: 1px solid #29395f;
+    border-radius: 11px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .recipe-card.ready {
+    border-color: #fbbf24;
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.25);
+  }
+  .recipe-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .ing-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .ing-pill {
+    font-size: 11px;
+    padding: 3px 7px;
+    border-radius: 6px;
+    background: #1e293b;
+    color: #64748b;
+    border: 1px solid #334155;
+    font-weight: 700;
+  }
+  .ing-pill.owned {
+    background: rgba(34, 197, 94, 0.18);
+    color: #4ade80;
+    border-color: #22c55e;
+  }
+  .craft-do-btn {
+    background: #f59e0b;
+    color: #000;
+    border: none;
+    border-radius: 7px;
+    padding: 6px 11px;
+    font-weight: 900;
+    font-size: 12px;
+  }
+  .craft-do-btn:disabled {
+    background: #334155;
+    color: #64748b;
+  }
+  .upg-row {
+    background: #0d1426;
+    border: 1px solid #29395f;
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="top-hud">
+  <div class="hud-row">
+    <div class="wave-badge">
+      <span id="waveText">WAVE 1</span>
+      <span class="wave-timer" id="timerText">00:25</span>
+    </div>
+    <div class="enemy-counter">
+      <div class="enemy-bar" id="enemyBar"></div>
+      <div class="enemy-text" id="enemyText">해군 0 / 80</div>
+    </div>
+  </div>
+  <div class="hud-row">
+    <div class="currencies">
+      <div class="curr-pill" style="color:var(--gold)">💰 <span id="berryText">100</span></div>
+      <div class="curr-pill" style="color:var(--gem)">💎 <span id="gemText">2</span></div>
+      <div class="curr-pill" style="color:#a7f3d0; font-size:11px;">최고 <span id="bestWaveText">1</span>W</div>
+    </div>
+    <div class="mini-btns">
+      <button class="mini-btn" id="speedBtn">1x</button>
+      <button class="mini-btn active" id="sfxBtn">🔊</button>
+    </div>
+  </div>
+</div>
+
+<div class="stage-wrap">
+  <div class="craft-alert-bar" id="craftAlertBar"></div>
+  <canvas id="gameCanvas"></canvas>
+</div>
+
+<div class="unit-inspector" id="inspector">
+  <div class="unit-info-left">
+    <div class="unit-title" id="insTitle">타일의 동료를 터치하거나 드래그해 보세요</div>
+    <div class="unit-desc" id="insDesc">같은 동료 드래그: 상위 합성 | 다른 칸 드래그: 자리 이동</div>
+  </div>
+  <div class="unit-actions" id="insActions" style="display:none;">
+    <button class="u-btn merge" id="btnMerge">합성</button>
+    <button class="u-btn lock" id="btnLock">🔒잠금</button>
+    <button class="u-btn sell" id="btnSell">판매</button>
+  </div>
+</div>
+
+<div class="bottom-panel">
+  <button class="act-btn summon" id="btnSummon">
+    <span>🏴‍☠️ 동료 소환</span>
+    <span class="sub" id="summonCostText">💰 20 베리</span>
+  </button>
+  <button class="act-btn gamble" id="btnGamble">
+    <span>🎲 패기 도박</span>
+    <span class="sub">💎 1 (희귀~영웅)</span>
+  </button>
+  <button class="act-btn bounty" id="btnBounty">
+    <span>🎯 현상금 보스</span>
+    <span class="sub" id="bountySubText">즉시 호출 (+💎2)</span>
+  </button>
+  <button class="act-btn" id="btnOpenUpg">
+    <span>⚔️ 해적단 강화</span>
+    <span class="sub">공격력 · 확률</span>
+  </button>
+  <button class="act-btn" id="btnOpenRecipe">
+    <div class="badge-count" id="recipeBadge">0</div>
+    <span>📜 원랜디 조합표</span>
+    <span class="sub">신화 · 초월</span>
+  </button>
+</div>
+
+<!-- 조합표 모달 -->
+<div class="modal-backdrop" id="recipeModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span>📜 원랜디 신화 · 초월 조합표</span>
+      <button class="close-btn" onclick="closeModals()">닫기</button>
+    </div>
+    <div class="modal-body" id="recipeListBody"></div>
+  </div>
+</div>
+
+<!-- 강화소 모달 -->
+<div class="modal-backdrop" id="upgModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span>⚔️ 해적단 패기 · 무기 강화</span>
+      <button class="close-btn" onclick="closeModals()">닫기</button>
+    </div>
+    <div class="modal-body" id="upgListBody"></div>
+  </div>
+</div>
+
+<!-- 결과 모달 -->
+<div class="modal-backdrop" id="resultModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span id="resultTitle">전투 종료</span>
+    </div>
+    <div class="modal-body" style="text-align:center; padding:22px 16px;">
+      <p id="resultMsg" style="font-size:15px; line-height:1.5; margin-bottom:16px;"></p>
+      <button class="craft-do-btn" style="padding:12px; font-size:15px;" onclick="restartGame()">다시 출항하기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =========================================================================
+// 1. 캐릭터 데이터베이스 & 원랜디 조합식 (아이패드에서 자유롭게 수정/추가 가능!)
+// =========================================================================
+const TIER_INFO = {
+  1: { name: '일반', color: '#94a3b8' },
+  2: { name: '희귀', color: '#38bdf8' },
+  3: { name: '영웅', color: '#c084fc' },
+  4: { name: '신화', color: '#fbbf24' },
+  5: { name: '초월', color: '#f43f5e' }
+};
+
+const UNIT_DB = {
+  // --- 1티어: 일반 ---
+  luffy1:   { id:'luffy1', name:'루피', badge:'밀짚', tier:1, color:'#ef4444', atk:24, rate:1.25, range:115, type:'phys', desc:'빠른 물리 연타 (고무고무 피스톨)', skillName:'개틀링!', maxMana:8 },
+  zoro1:    { id:'zoro1', name:'조로', badge:'삼도', tier:1, color:'#22c55e', atk:34, rate:0.9, range:95, splash:38, type:'phys', desc:'근접 범위 참격', skillName:'도깨비 참수!', maxMana:7 },
+  nami1:    { id:'nami1', name:'나미', badge:'번개', tier:1, color:'#f97316', atk:28, rate:0.85, range:135, splash:45, type:'magic', desc:'마법 범위 번개 공격', skillName:'선더볼트 템포!', maxMana:6 },
+  usopp1:   { id:'usopp1', name:'우솝', badge:'저격', tier:1, color:'#eab308', atk:22, rate:1.0, range:165, stun:0.55, stunChance:0.25, type:'phys', desc:'장거리 저격 + 25% 확률 스턴', skillName:'화약성!', maxMana:7 },
+  sanji1:   { id:'sanji1', name:'상디', badge:'발차기', tier:1, color:'#3b82f6', atk:25, rate:1.15, range:95, shred:12, type:'phys', desc:'타격 대상 방어력 -12 감소', skillName:'콜리에 스트라이크!', maxMana:7 },
+  chopper1: { id:'chopper1', name:'쵸파', badge:'군의', tier:1, color:'#ec4899', atk:18, rate:1.0, range:95, auraSpd:0.18, type:'phys', desc:'인접 아군 공격속도 +18% 버프', skillName:'럼블볼 강화!', maxMana:8 },
+  buggy1:   { id:'buggy1', name:'버기', badge:'동강', tier:1, color:'#06b6d4', atk:19, rate:1.1, range:120, berryChance:0.22, type:'phys', desc:'공격 시 22% 확률 +2 베리 강탈', skillName:'머기탄!', maxMana:7 },
+
+  // --- 2티어: 희귀 ---
+  luffy2:   { id:'luffy2', name:'기어2 루피', badge:'G2', tier:2, color:'#f87171', atk:68, rate:1.75, range:115, type:'phys', desc:'초고속 단일 물리 딜러', skillName:'제트 개틀링!', maxMana:9 },
+  zoro2:    { id:'zoro2', name:'아수라 조로', badge:'귀기', tier:2, color:'#4ade80', atk:98, rate:1.05, range:105, splash:46, type:'phys', desc:'고화력 범위 참격 딜러', skillName:'일무은!', maxMana:7 },
+  sanji2:   { id:'sanji2', name:'악마풍각 상디', badge:'염열', tier:2, color:'#fb923c', atk:76, rate:1.3, range:105, splash:36, shred:25, type:'phys', desc:'화염 스플래시 + 방어력 -25 감소', skillName:'디아블 잠브!', maxMana:7 },
+  robin2:   { id:'robin2', name:'니코 로빈', badge:'꽃꽃', tier:2, color:'#a855f7', atk:62, rate:1.0, range:145, slow:0.42, splash:45, type:'magic', desc:'범위 이속 42% 감소 + 마법 피해', skillName:'시엔 플루르!', maxMana:6 },
+  franky2:  { id:'franky2', name:'프랑키', badge:'철인', tier:2, color:'#0ea5e9', atk:115, rate:0.8, range:155, splash:52, type:'magic', desc:'고화력 범위 레이저 포격', skillName:'라디컬 빔!', maxMana:6 },
+  brook2:   { id:'brook2', name:'브룩', badge:'소울', tier:2, color:'#cbd5e1', atk:66, rate:1.25, range:115, slow:0.35, stun:0.45, stunChance:0.2, type:'magic', desc:'냉기 슬로우 + 빙결 스턴', skillName:'콧노래 삼정검!', maxMana:7 },
+
+  // --- 3티어: 영웅 ---
+  law3:     { id:'law3', name:'트라팔가 로', badge:'ROOM', tier:3, color:'#38bdf8', atk:210, rate:1.35, range:155, splash:55, shred:45, type:'haki', desc:'광역 방어력 -45 절단 + 패기 피해', skillName:'룸·감마 나이프!', maxMana:7 },
+  kid3:     { id:'kid3', name:'유스타스 키드', badge:'자력', tier:3, color:'#ef4444', atk:275, rate:0.95, range:140, splash:65, stun:0.65, stunChance:0.3, type:'phys', desc:'광역 자기장 폭격 + 30% 스턴', skillName:'댐드 펑크!', maxMana:6 },
+  ace3:     { id:'ace3', name:'포트거스 D. 에이스', badge:'화권', tier:3, color:'#f97316', atk:245, rate:1.25, range:150, splash:70, type:'magic', desc:'넓은 화염 폭발 지속 딜러', skillName:'대염계 염제!', maxMana:7 },
+  jinbe3:   { id:'jinbe3', name:'징베', badge:'협객', tier:3, color:'#0284c7', atk:230, rate:1.05, range:120, splash:58, stun:0.85, stunChance:0.38, type:'haki', desc:'어인공수도 고확률 광역 스턴', skillName:'무뢰관!', maxMana:6 },
+
+  // --- 4티어: 신화 (원랜디 조합 전용!) ---
+  nika4:    { id:'nika4', name:'기어5 니카 루피', badge:'니카', tier:4, color:'#fef08a', atk:920, rate:1.8, range:175, splash:82, stun:0.7, stunChance:0.32, type:'haki', desc:'[신화] 태양의 신 광역 번개·패왕색 폭격', skillName:'고무고무 바즈랑 건!', maxMana:7 },
+  zoro4:    { id:'zoro4', name:'염왕 조로', badge:'염왕', tier:4, color:'#4ade80', atk:1380, rate:1.45, range:140, splash:58, type:'haki', desc:'[신화] 보스를 찢는 극한의 패왕색 참격', skillName:'염왕 삼도룡!', maxMana:6 },
+  wb4:      { id:'wb4', name:'흰수염 뉴게이트', badge:'지진', tier:4, color:'#e2e8f0', atk:1150, rate:1.1, range:170, splash:105, stun:1.1, stunChance:0.45, type:'haki', desc:'[신화] 공간 균열 초대형 지진 스턴', skillName:'대기 진동!', maxMana:6 },
+  shanks4:  { id:'shanks4', name:'붉은머리 샹크스', badge:'사황', tier:4, color:'#dc2626', atk:1080, rate:1.65, range:195, splash:65, globalAtk:0.22, type:'haki', desc:'[신화] 전체 아군 공격력 +22% & 카무사리', skillName:'카무사리(신피)!', maxMana:6 },
+  kuzan4:   { id:'kuzan4', name:'아오키지 쿠잔', badge:'빙하', tier:4, color:'#67e8f9', atk:790, rate:1.35, range:180, splash:95, slow:0.68, stun:0.9, stunChance:0.35, type:'magic', desc:'[신화] 트랙을 얼리는 최강의 빙결 CC', skillName:'아이스 에이지!', maxMana:5 },
+
+  // --- 5티어: 초월 히든 ---
+  roger5:   { id:'roger5', name:'골 D. 로저', badge:'해적왕', tier:5, color:'#f43f5e', atk:3600, rate:1.9, range:220, splash:110, globalAtk:0.35, shred:60, type:'haki', desc:'[초월] 해적왕의 패기 + 매 웨이브 💎1 획득', skillName:'해적왕의 카무사리!', maxMana:5 }
+};
+
+const RECIPES = [
+  { result: 'nika4',   materials: ['luffy2', 'law3', 'chopper1'] },
+  { result: 'zoro4',   materials: ['zoro2', 'franky2', 'sanji1'] },
+  { result: 'wb4',     materials: ['ace3', 'jinbe3', 'buggy1'] },
+  { result: 'shanks4', materials: ['kid3', 'usopp1', 'luffy1'] },
+  { result: 'kuzan4',  materials: ['robin2', 'brook2', 'nami1'] },
+  { result: 'roger5',  materials: ['shanks4', 'wb4'] }
+];
+
+const TIER_POOLS = {
+  1: Object.values(UNIT_DB).filter(u => u.tier === 1).map(u => u.id),
+  2: Object.values(UNIT_DB).filter(u => u.tier === 2).map(u => u.id),
+  3: Object.values(UNIT_DB).filter(u => u.tier === 3).map(u => u.id)
+};
+
+// =========================================================================
+// 2. 사운드 엔진 (외부 파일 없는 Web Audio 신디사이저)
+// =========================================================================
+let audioCtx = null;
+let sfxEnabled = true;
+
+function playTone(freq, dur = 0.08, type = 'sine', vol = 0.08) {
+  if (!sfxEnabled) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + dur);
+  } catch (e) {}
+}
+
+function sfxSummon() { playTone(520, 0.07, 'triangle', 0.1); setTimeout(() => playTone(760, 0.09, 'triangle', 0.1), 45); }
+function sfxMythic() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => playTone(f, 0.16, 'triangle', 0.14), i * 70)); }
+function sfxFail() { playTone(210, 0.16, 'sawtooth', 0.09); }
+
+// =========================================================================
+// 3. 게임 상태 & 로컬 저장소
+// =========================================================================
+const COLS = 3, ROWS = 5;
+const MAX_ENEMIES = 80;
+
+let bestWave = 1;
+try { bestWave = parseInt(localStorage.getItem('oprd_best_wave') || '1', 10); } catch (e) {}
+
+let state = {};
+function initGameState() {
+  state = {
+    wave: 1,
+    waveTimer: 25,
+    spawnRemaining: 18,
+    spawnCooldown: 0.5,
+    isBossWave: false,
+    berries: 100,
+    gems: 2,
+    summonCost: 20,
+    bountyCooldown: 0,
+    gameSpeed: 1,
+    gameOver: false,
+    grid: new Array(COLS * ROWS).fill(null),
+    enemies: [],
+    projectiles: [],
+    effects: [],
+    floatTexts: [],
+    selectedIdx: -1,
+    upgrades: { commonAtk: 0, epicAtk: 0, mythicAtk: 0, luckLv: 0 }
+  };
+  document.getElementById('bestWaveText').textContent = bestWave;
+  setupWave(1);
+  updateUI();
+  updateInspector();
+}
+
+function saveBestWave(w) {
+  if (w > bestWave) {
+    bestWave = w;
+    document.getElementById('bestWaveText').textContent = bestWave;
+    try { localStorage.setItem('oprd_best_wave', String(bestWave)); } catch (e) {}
+  }
+}
+
+// =========================================================================
+// 4. 캔버스 및 트랙 레이아웃 계산
+// =========================================================================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let W = 360, H = 500, tileSize = 64, gridX = 50, gridY = 50;
+let trackRect = { x: 20, y: 20, w: 320, h: 460, perim: 1560 };
+
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  W = rect.width;
+  H = rect.height;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const corridor = Math.min(Math.max(W * 0.13, 38), 52);
+  const availW = W - corridor * 2 - 14;
+  const availH = H - corridor * 2 - 14;
+  tileSize = Math.floor(Math.min(availW / COLS, availH / ROWS));
+  const gridW = tileSize * COLS;
+  const gridH = tileSize * ROWS;
+  gridX = Math.floor((W - gridW) / 2);
+  gridY = Math.floor((H - gridH) / 2);
+
+  const pad = Math.floor(corridor * 0.56);
+  trackRect.x = gridX - pad;
+  trackRect.y = gridY - pad;
+  trackRect.w = gridW + pad * 2;
+  trackRect.h = gridH + pad * 2;
+  trackRect.perim = 2 * (trackRect.w + trackRect.h);
+}
+window.addEventListener('resize', resizeCanvas);
+
+function getTileCenter(idx) {
+  const c = idx % COLS;
+  const r = Math.floor(idx / COLS);
+  return { x: gridX + c * tileSize + tileSize / 2, y: gridY + r * tileSize + tileSize / 2 };
+}
+
+function getTileAtPoint(px, py) {
+  if (px < gridX || px >= gridX + COLS * tileSize || py < gridY || py >= gridY + ROWS * tileSize) return -1;
+  const c = Math.floor((px - gridX) / tileSize);
+  const r = Math.floor((py - gridY) / tileSize);
+  return r * COLS + c;
+}
+
+function getTrackPos(dist) {
+  let d = ((dist % trackRect.perim) + trackRect.perim) % trackRect.perim;
+  if (d < trackRect.w) return { x: trackRect.x + d, y: trackRect.y };
+  d -= trackRect.w;
+  if (d < trackRect.h) return { x: trackRect.x + trackRect.w, y: trackRect.y + d };
+  d -= trackRect.h;
+  if (d < trackRect.w) return { x: trackRect.x + trackRect.w - d, y: trackRect.y + trackRect.h };
+  d -= trackRect.w;
+  return { x: trackRect.x, y: trackRect.y + trackRect.h - d };
+}
+
+// =========================================================================
+// 5. 웨이브 · 스폰 · 현상금 보스 시스템
+// =========================================================================
+const BOSS_NAMES = {
+  10: '파시피스타 PX-0',
+  20: '해군대장 키자루',
+  30: '해군대장 아오키지',
+  40: '해군원수 아카이누',
+  50: '오로성 새턴 성'
+};
+
+function setupWave(w) {
+  state.wave = w;
+  saveBestWave(w);
+  state.isBossWave = (w % 10 === 0);
+
+  // 로저 보유 시 매 웨이브 패기석 보너스
+  const rogerCount = state.grid.filter(u => u && u.id === 'roger5').length;
+  if (rogerCount > 0 && w > 1) {
+    state.gems += rogerCount;
+    addFloatText(W / 2, gridY - 12, `해적왕 보너스 +💎${rogerCount}`, '#38bdf8');
+  }
+
+  if (state.isBossWave) {
+    state.waveTimer = 50;
+    state.spawnRemaining = 0;
+    spawnBoss(w);
+  } else {
+    state.waveTimer = 24;
+    state.spawnRemaining = 20;
+    state.spawnCooldown = 0.4;
+  }
+}
+
+function calcWaveHp(w) {
+  return Math.round(75 * Math.pow(1.16, w - 1));
+}
+
+function spawnRegularMarine() {
+  const hp = calcWaveHp(state.wave);
+  const def = Math.floor(state.wave * 1.4);
+  state.enemies.push({
+    name: state.wave >= 15 ? '해군 본부병' : '해군 잡병',
+    dist: 0,
+    hp, maxHp: hp,
+    def,
+    speed: 78 + Math.min(35, state.wave * 0.7),
+    radius: 10,
+    color: '#e2e8f0',
+    stunT: 0, slowT: 0, slowVal: 0, shredT: 0, shredVal: 0,
+    isBoss: false, isBounty: false
+  });
+}
+
+function spawnBoss(w) {
+  const hp = calcWaveHp(w) * 24;
+  const bName = BOSS_NAMES[w] || `신세계 강적 Lv.${w}`;
+  state.enemies.push({
+    name: bName,
+    dist: 0,
+    hp, maxHp: hp,
+    def: Math.floor(w * 2.2),
+    speed: 62,
+    radius: 17,
+    color: '#ef4444',
+    stunT: 0, slowT: 0, slowVal: 0, shredT: 0, shredVal: 0,
+    isBoss: true, isBounty: false
+  });
+  addFloatText(W / 2, H * 0.35, `⚠️ 보스 등장: ${bName}`, '#f87171');
+}
+
+function summonBountyBoss() {
+  if (state.bountyCooldown > 0 || state.gameOver) return;
+  const bountyNames = ['크로커다일', '도플라밍고', '미호크', '검은수염 티치'];
+  const name = bountyNames[Math.floor((state.wave - 1) / 10) % bountyNames.length];
+  const hp = calcWaveHp(state.wave) * 11;
+  state.bountyCooldown = 35;
+  state.enemies.push({
+    name: `[현상범] ${name}`,
+    dist: 0,
+    hp, maxHp: hp,
+    def: Math.floor(state.wave * 1.5),
+    speed: 70,
+    radius: 15,
+    color: '#fbbf24',
+    stunT: 0, slowT: 0, slowVal: 0, shredT: 0, shredVal: 0,
+    isBoss: false, isBounty: true,
+    bountyTimer: 28
+  });
+  sfxSummon();
+  addFloatText(W / 2, gridY + 20, `🎯 현상범 ${name} 출현! (28초)`, '#fbbf24');
+  updateUI();
+}
+
+// =========================================================================
+// 6. 동료 소환 · 도박 · 합성 · 원랜디 조합 로직
+// =========================================================================
+function findEmptyTile() {
+  const empties = [];
+  state.grid.forEach((u, i) => { if (!u) empties.push(i); });
+  if (empties.length === 0) return -1;
+  return empties[Math.floor(Math.random() * empties.length)];
+}
+
+function createUnitInstance(unitId) {
+  return { id: unitId, cd: 0, mana: 0, locked: false, atkMultAura: 1, spdMultAura: 1 };
+}
+
+function summonUnit() {
+  if (state.gameOver) return;
+  if (state.berries < state.summonCost) { sfxFail(); return; }
+  const slot = findEmptyTile();
+  if (slot === -1) {
+    addFloatText(W / 2, H / 2, '필드가 가득 찼습니다!', '#ef4444');
+    sfxFail();
+    return;
+  }
+  state.berries -= state.summonCost;
+  state.summonCost += 2;
+
+  // 확률 업그레이드 반영
+  const rareChance = 0.12 + state.upgrades.luckLv * 0.04;
+  const epicChance = 0.015 + state.upgrades.luckLv * 0.012;
+  const roll = Math.random();
+  let tier = 1;
+  if (roll < epicChance) tier = 3;
+  else if (roll < epicChance + rareChance) tier = 2;
+
+  const pool = TIER_POOLS[tier];
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  state.grid[slot] = createUnitInstance(pick);
+
+  const pos = getTileCenter(slot);
+  state.effects.push({ type: 'ring', x: pos.x, y: pos.y, r: 6, maxR: 34, color: TIER_INFO[tier].color, life: 0.3 });
+  if (tier >= 2) addFloatText(pos.x, pos.y - 16, `${TIER_INFO[tier].name}! ${UNIT_DB[pick].name}`, TIER_INFO[tier].color);
+  sfxSummon();
+  state.selectedIdx = slot;
+  onBoardChanged();
+}
+
+function gambleUnit() {
+  if (state.gameOver) return;
+  if (state.gems < 1) { sfxFail(); addFloatText(W / 2, H / 2, '패기석(💎)이 부족합니다!', '#38bdf8'); return; }
+  const slot = findEmptyTile();
+  if (slot === -1) { sfxFail(); addFloatText(W / 2, H / 2, '빈 타일이 없습니다!', '#ef4444'); return; }
+
+  state.gems -= 1;
+  const roll = Math.random();
+  const pos = getTileCenter(slot);
+
+  if (roll < 0.22) {
+    // 영웅 대성공
+    const pick = TIER_POOLS[3][Math.floor(Math.random() * TIER_POOLS[3].length)];
+    state.grid[slot] = createUnitInstance(pick);
+    sfxMythic();
+    addFloatText(pos.x, pos.y - 18, `대성공! [영웅] ${UNIT_DB[pick].name}`, '#c084fc');
+    state.effects.push({ type: 'ring', x: pos.x, y: pos.y, r: 6, maxR: 48, color: '#c084fc', life: 0.4 });
+  } else if (roll < 0.72) {
+    // 희귀 성공
+    const pick = TIER_POOLS[2][Math.floor(Math.random() * TIER_POOLS[2].length)];
+    state.grid[slot] = createUnitInstance(pick);
+    sfxSummon();
+    addFloatText(pos.x, pos.y - 18, `성공! [희귀] ${UNIT_DB[pick].name}`, '#38bdf8');
+    state.effects.push({ type: 'ring', x: pos.x, y: pos.y, r: 6, maxR: 36, color: '#38bdf8', life: 0.3 });
+  } else {
+    // 실패
+    sfxFail();
+    addFloatText(pos.x, pos.y - 10, `도박 실패... 💨`, '#94a3b8');
+  }
+  onBoardChanged();
+}
+
+function mergeUnits(idxA, idxB) {
+  const uA = state.grid[idxA];
+  const uB = state.grid[idxB];
+  if (!uA || !uB || idxA === idxB || uA.id !== uB.id) return false;
+  if (uA.locked || uB.locked) {
+    addFloatText(W / 2, gridY + 20, '🔒 잠금된 동료는 합성되지 않습니다', '#fbbf24');
+    return false;
+  }
+  const spec = UNIT_DB[uA.id];
+  if (spec.tier >= 3) {
+    addFloatText(W / 2, gridY + 20, '영웅 이상은 [원랜디 조합표]로 조합하세요!', '#c084fc');
+    return false;
+  }
+  const nextTier = spec.tier + 1;
+  const pool = TIER_POOLS[nextTier];
+  const nextId = pool[Math.floor(Math.random() * pool.length)];
+
+  state.grid[idxA] = null;
+  state.grid[idxB] = createUnitInstance(nextId);
+  state.selectedIdx = idxB;
+
+  const pos = getTileCenter(idxB);
+  state.effects.push({ type: 'ring', x: pos.x, y: pos.y, r: 8, maxR: 42, color: TIER_INFO[nextTier].color, life: 0.35 });
+  addFloatText(pos.x, pos.y - 18, `합성! ${UNIT_DB[nextId].name}`, TIER_INFO[nextTier].color);
+  sfxSummon();
+  onBoardChanged();
+  return true;
+}
+
+function getCraftableRecipes() {
+  const counts = {};
+  state.grid.forEach(u => { if (u) counts[u.id] = (counts[u.id] || 0) + 1; });
+  return RECIPES.filter(r => r.materials.every(m => (counts[m] || 0) >= 1));
+}
+
+function executeRecipe(resultId) {
+  const recipe = RECIPES.find(r => r.result === resultId);
+  if (!recipe) return;
+
+  // 재료 인덱스 확보
+  const usedIndices = [];
+  for (const matId of recipe.materials) {
+    const foundIdx = state.grid.findIndex((u, idx) => u && u.id === matId && !usedIndices.includes(idx));
+    if (foundIdx === -1) return;
+    usedIndices.push(foundIdx);
+  }
+
+  const spawnIdx = usedIndices[0];
+  usedIndices.forEach(idx => { state.grid[idx] = null; });
+  state.grid[spawnIdx] = createUnitInstance(resultId);
+  state.selectedIdx = spawnIdx;
+
+  const spec = UNIT_DB[resultId];
+  const pos = getTileCenter(spawnIdx);
+  state.effects.push({ type: 'ring', x: pos.x, y: pos.y, r: 10, maxR: 85, color: TIER_INFO[spec.tier].color, life: 0.55 });
+  addFloatText(pos.x, pos.y - 22, `⚡ [${TIER_INFO[spec.tier].name}] ${spec.name} 강림!`, TIER_INFO[spec.tier].color);
+  sfxMythic();
+  closeModals();
+  onBoardChanged();
+}
+
+function onBoardChanged() {
+  recalcAuras();
+  updateUI();
+  updateInspector();
+  renderCraftAlertBar();
+}
+
+function recalcAuras() {
+  let globalAtkBonus = 0;
+  state.grid.forEach(u => {
+    if (!u) return;
+    u.atkMultAura = 1;
+    u.spdMultAura = 1;
+    const spec = UNIT_DB[u.id];
+    if (spec.globalAtk) globalAtkBonus += spec.globalAtk;
+  });
+
+  state.grid.forEach((u, idx) => {
+    if (!u) return;
+    u.atkMultAura += globalAtkBonus;
+    const spec = UNIT_DB[u.id];
+    if (spec.auraSpd) {
+      const c = idx % COLS, r = Math.floor(idx / COLS);
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          const nc = c + dc, nr = r + dr;
+          if (nc >= 0 && nc < COLS && nr >= 0 && nr < ROWS) {
+            const target = state.grid[nr * COLS + nc];
+            if (target) target.spdMultAura += spec.auraSpd;
+          }
+        }
+      }
+    }
+  });
+}
+
+function getUnitFinalAtk(u) {
+  const spec = UNIT_DB[u.id];
+  let upgLv = 0, perLv = 0.2;
+  if (spec.tier <= 2) { upgLv = state.upgrades.commonAtk; perLv = 0.22; }
+  else if (spec.tier === 3) { upgLv = state.upgrades.epicAtk; perLv = 0.25; }
+  else { upgLv = state.upgrades.mythicAtk; perLv = 0.30; }
+  return Math.round(spec.atk * (1 + upgLv * perLv) * u.atkMultAura);
+}
+
+// =========================================================================
+// 7. 전투 루프 & 데미지 연산
+// =========================================================================
+function dealDamage(enemy, rawDmg, dmgType) {
+  const effDef = Math.max(-25, enemy.def - (enemy.shredT > 0 ? enemy.shredVal : 0));
+  let mult = 1;
+  if (effDef >= 0) {
+    if (dmgType === 'haki') mult = 1; // 패기 공격은 양수 방어력 완전 무시
+    else if (dmgType === 'magic') mult = 100 / (100 + effDef * 2.2);
+    else mult = 100 / (100 + effDef * 4.2);
+  } else {
+    // 방깎으로 마이너스 방어력이 되면 추가 피해 증폭!
+    mult = 1 + Math.abs(effDef) * 0.032;
+  }
+  enemy.hp -= rawDmg * mult;
+}
+
+function applyHitEffects(enemy, spec, baseDmg, isSkill) {
+  const dmg = isSkill ? baseDmg * 2.4 : baseDmg;
+  dealDamage(enemy, dmg, spec.type);
+
+  if (spec.shred && spec.shred > enemy.shredVal) {
+    enemy.shredVal = spec.shred;
+    enemy.shredT = 4.0;
+  } else if (spec.shred) {
+    enemy.shredT = 4.0;
+  }
+
+  if (spec.slow && spec.slow >= enemy.slowVal) {
+    enemy.slowVal = spec.slow;
+    enemy.slowT = 2.6;
+  }
+
+  if (spec.stun && (isSkill || Math.random() < (spec.stunChance || 0))) {
+    const dur = enemy.isBoss ? spec.stun * 0.45 : spec.stun;
+    enemy.stunT = Math.max(enemy.stunT, dur);
+  }
+}
+
+function updateSimulation(dt) {
+  if (state.gameOver) return;
+
+  // 현상금 쿨타임
+  if (state.bountyCooldown > 0) {
+    state.bountyCooldown = Math.max(0, state.bountyCooldown - dt);
+  }
+
+  // 웨이브 스폰 및 타이머
+  if (!state.isBossWave && state.spawnRemaining > 0) {
+    state.spawnCooldown -= dt;
+    if (state.spawnCooldown <= 0) {
+      spawnRegularMarine();
+      state.spawnRemaining--;
+      state.spawnCooldown = 0.68;
+    }
+  }
+
+  state.waveTimer -= dt;
+  if (state.isBossWave) {
+    const bossAlive = state.enemies.some(e => e.isBoss);
+    if (!bossAlive) {
+      state.berries += 50 + state.wave * 3;
+      state.gems += 3;
+      addFloatText(W / 2, H * 0.4, `보스 격파! +💎3`, '#38bdf8');
+      if (state.wave === 50) {
+        triggerEndModal('🏆 위대한 항로 제패!', '50웨이브 오로성 보스를 물리쳤습니다! 계속해서 무한 웨이브에 도전하거나 새로 시작할 수 있습니다.');
+      }
+      setupWave(state.wave + 1);
+    } else if (state.waveTimer <= 0) {
+      state.gameOver = true;
+      triggerEndModal('💀 보스 제한시간 초과', `WAVE ${state.wave} 대장 보스를 시간 내에 쓰러뜨리지 못했습니다.`);
+      return;
+    }
+  } else if (state.waveTimer <= 0) {
+    state.berries += 22 + state.wave * 2;
+    if (state.wave % 5 === 0) {
+      state.gems += 1;
+      addFloatText(W / 2, gridY - 10, `5웨이브 돌파 +💎1`, '#38bdf8');
+    }
+    setupWave(state.wave + 1);
+  }
+
+  // 적 이동 업데이트
+  for (let i = state.enemies.length - 1; i >= 0; i--) {
+    const e = state.enemies[i];
+    if (e.hp <= 0) {
+      if (e.isBounty) {
+        state.gems += 2;
+        state.berries += 30 + state.wave * 2;
+        sfxMythic();
+        const p = getTrackPos(e.dist);
+        addFloatText(p.x, p.y - 12, `현상금 사냥 성공! +💎2`, '#fbbf24');
+      } else if (!e.isBoss) {
+        state.berries += 4 + Math.floor(state.wave / 5);
+      }
+      state.enemies.splice(i, 1);
+      continue;
+    }
+
+    if (e.isBounty) {
+      e.bountyTimer -= dt;
+      if (e.bountyTimer <= 0) {
+        const p = getTrackPos(e.dist);
+        addFloatText(p.x, p.y, '현상범 도주...', '#94a3b8');
+        state.enemies.splice(i, 1);
+        continue;
+      }
+    }
+
+    if (e.stunT > 0) e.stunT -= dt;
+    else {
+      const slowFactor = e.slowT > 0 ? (1 - e.slowVal) : 1;
+      e.dist += e.speed * slowFactor * dt;
+    }
+    if (e.slowT > 0) e.slowT -= dt;
+    if (e.shredT > 0) e.shredT -= dt;
+  }
+
+  // 마릿수 초과 패배 체크
+  if (state.enemies.length >= MAX_ENEMIES) {
+    state.gameOver = true;
+    triggerEndModal('💀 해군 포위망 돌파 실패', `필드 적 마릿수가 ${MAX_ENEMIES}마리에 도달해 해적단이 포위되었습니다. (도달: WAVE ${state.wave})`);
+    return;
+  }
+
+  // 유닛 공격
+  state.grid.forEach((u, idx) => {
+    if (!u) return;
+    const spec = UNIT_DB[u.id];
+    u.cd -= dt * u.spdMultAura;
+    if (u.cd > 0 || state.enemies.length === 0) return;
+
+    const pos = getTileCenter(idx);
+    // 사거리 내 타겟 탐색 (보스/현상범 우선)
+    let bestTarget = null;
+    let bestScore = -1;
+    for (const e of state.enemies) {
+      const ep = getTrackPos(e.dist);
+      const dist = Math.hypot(ep.x - pos.x, ep.y - pos.y);
+      if (dist <= spec.range) {
+        const score = (e.isBoss ? 10000 : 0) + (e.isBounty ? 5000 : 0) + (e.dist % trackRect.perim);
+        if (score > bestScore) { bestScore = score; bestTarget = { e, ep }; }
+      }
+    }
+
+    if (bestTarget) {
+      u.cd = 1 / spec.rate;
+      u.mana++;
+      const isSkill = u.mana >= spec.maxMana;
+      if (isSkill) {
+        u.mana = 0;
+        if (spec.tier >= 3) addFloatText(pos.x, pos.y - 20, spec.skillName, TIER_INFO[spec.tier].color);
+      }
+
+      if (spec.berryChance && Math.random() < spec.berryChance) {
+        state.berries += 2;
+        addFloatText(pos.x, pos.y - 10, '+2💰', '#fbbf24');
+      }
+
+      const finalAtk = getUnitFinalAtk(u);
+      state.projectiles.push({
+        x: pos.x, y: pos.y,
+        tx: bestTarget.ep.x, ty: bestTarget.ep.y,
+        target: bestTarget.e,
+        spec, dmg: finalAtk, isSkill,
+        color: TIER_INFO[spec.tier].color
+      });
+    }
+  });
+
+  // 투사체 이동 및 적중
+  for (let i = state.projectiles.length - 1; i >= 0; i--) {
+    const p = state.projectiles[i];
+    if (state.enemies.includes(p.target)) {
+      const tp = getTrackPos(p.target.dist);
+      p.tx = tp.x; p.ty = tp.y;
+    }
+    const dx = p.tx - p.x, dy = p.ty - p.y;
+    const d = Math.hypot(dx, dy);
+    const spd = 540 * dt;
+    if (d <= spd + 6) {
+      const splashR = p.spec.splash ? (p.isSkill ? p.spec.splash * 1.4 : p.spec.splash) : 0;
+      if (splashR > 0) {
+        state.effects.push({ type: 'ring', x: p.tx, y: p.ty, r: 4, maxR: splashR, color: p.color, life: 0.22 });
+        for (const e of state.enemies) {
+          const ep = getTrackPos(e.dist);
+          if (Math.hypot(ep.x - p.tx, ep.y - p.ty) <= splashR) {
+            applyHitEffects(e, p.spec, p.dmg, p.isSkill);
+          }
+        }
+      } else if (state.enemies.includes(p.target)) {
+        applyHitEffects(p.target, p.spec, p.dmg, p.isSkill);
+        if (p.isSkill) state.effects.push({ type: 'ring', x: p.tx, y: p.ty, r: 4, maxR: 28, color: p.color, life: 0.2 });
+      }
+      state.projectiles.splice(i, 1);
+    } else {
+      p.x += (dx / d) * spd;
+      p.y += (dy / d) * spd;
+    }
+  }
+
+  // 이펙트 & 플로팅 텍스트
+  for (let i = state.effects.length - 1; i >= 0; i--) {
+    state.effects[i].life -= dt;
+    if (state.effects[i].life <= 0) state.effects.splice(i, 1);
+  }
+  for (let i = state.floatTexts.length - 1; i >= 0; i--) {
+    state.floatTexts[i].y -= 24 * dt;
+    state.floatTexts[i].life -= dt;
+    if (state.floatTexts[i].life <= 0) state.floatTexts.splice(i, 1);
+  }
+}
+
+function addFloatText(x, y, text, color) {
+  state.floatTexts.push({ x, y, text, color, life: 1.05 });
+}
+
+// =========================================================================
+// 8. 렌더링 (Retina Canvas)
+// =========================================================================
+let dragState = { active: false, fromIdx: -1, x: 0, y: 0, moved: false };
+
+function drawGame() {
+  ctx.clearRect(0, 0, W, H);
+
+  // 위험 경고 테두리
+  if (state.enemies.length >= 60) {
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.45)';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3, 3, W - 6, H - 6);
+  }
+
+  // 해군 이동 트랙
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 24;
+  ctx.lineJoin = 'round';
+  ctx.strokeRect(trackRect.x, trackRect.y, trackRect.w, trackRect.h);
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 6]);
+  ctx.strokeRect(trackRect.x, trackRect.y, trackRect.w, trackRect.h);
+  ctx.setLineDash([]);
+
+  // 선택된 유닛 사거리 표시
+  if (state.selectedIdx >= 0 && state.grid[state.selectedIdx]) {
+    const su = state.grid[state.selectedIdx];
+    const sc = getTileCenter(state.selectedIdx);
+    ctx.beginPath();
+    ctx.arc(sc.x, sc.y, UNIT_DB[su.id].range, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.08)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
+
+  // 3x5 그리드 타일 및 유닛
+  for (let i = 0; i < COLS * ROWS; i++) {
+    const c = i % COLS, r = Math.floor(i / COLS);
+    const tx = gridX + c * tileSize, ty = gridY + r * tileSize;
+
+    ctx.fillStyle = (i === state.selectedIdx) ? '#1e3a5f' : '#131c33';
+    ctx.strokeStyle = (i === state.selectedIdx) ? '#60a5fa' : '#263559';
+    ctx.lineWidth = (i === state.selectedIdx) ? 2 : 1;
+    ctx.beginPath();
+    ctx.roundRect(tx + 3, ty + 3, tileSize - 6, tileSize - 6, 9);
+    ctx.fill();
+    ctx.stroke();
+
+    const u = state.grid[i];
+    if (u && !(dragState.active && dragState.moved && dragState.fromIdx === i)) {
+      drawUnitToken(tx + tileSize / 2, ty + tileSize / 2, u);
+    }
+  }
+
+  // 적 렌더링
+  for (const e of state.enemies) {
+    const p = getTrackPos(e.dist);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, e.radius, 0, Math.PI * 2);
+    ctx.fillStyle = e.stunT > 0 ? '#fde047' : (e.slowT > 0 ? '#67e8f9' : e.color);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#090d16';
+    ctx.stroke();
+
+    // 방깎 표시
+    if (e.shredT > 0) {
+      ctx.fillStyle = '#f97316';
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('방깎', p.x, p.y + 3);
+    }
+
+    // 체력바
+    const bw = e.isBoss || e.isBounty ? 38 : 22;
+    const hpRatio = Math.max(0, e.hp / e.maxHp);
+    ctx.fillStyle = '#090d16';
+    ctx.fillRect(p.x - bw / 2, p.y - e.radius - 8, bw, 4);
+    ctx.fillStyle = e.isBoss ? '#ef4444' : (e.isBounty ? '#fbbf24' : '#22c55e');
+    ctx.fillRect(p.x - bw / 2, p.y - e.radius - 8, bw * hpRatio, 4);
+
+    if (e.isBoss || e.isBounty) {
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      const label = e.isBounty ? `${e.name} (${Math.ceil(e.bountyTimer)}s)` : e.name;
+      ctx.fillText(label, p.x, p.y - e.radius - 12);
+    }
+  }
+
+  // 투사체
+  for (const p of state.projectiles) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.isSkill ? 5.5 : 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+  }
+
+  // 링 이펙트
+  for (const ef of state.effects) {
+    const prog = 1 - Math.max(0, ef.life / 0.35);
+    const curR = ef.r + (ef.maxR - ef.r) * Math.min(1, prog);
+    ctx.beginPath();
+    ctx.arc(ef.x, ef.y, curR, 0, Math.PI * 2);
+    ctx.strokeStyle = ef.color;
+    ctx.globalAlpha = Math.max(0, ef.life * 2.5);
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // 드래그 중인 유닛 고스트
+  if (dragState.active && dragState.moved && state.grid[dragState.fromIdx]) {
+    drawUnitToken(dragState.x, dragState.y, state.grid[dragState.fromIdx], 1.12);
+  }
+
+  // 플로팅 텍스트
+  for (const ft of state.floatTexts) {
+    ctx.font = '900 12px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#000';
+    ctx.fillText(ft.text, ft.x + 1, ft.y + 1);
+    ctx.fillStyle = ft.color;
+    ctx.fillText(ft.text, ft.x, ft.y);
+  }
+}
+
+function drawUnitToken(cx, cy, u, scale = 1) {
+  const spec = UNIT_DB[u.id];
+  const tierCol = TIER_INFO[spec.tier].color;
+  const r = (tileSize * 0.34) * scale;
+
+  // 신화/초월 후광
+  if (spec.tier >= 4) {
+    ctx.beginPath();
+    ctx.arc(cx, cy - 2, r + 5, 0, Math.PI * 2);
+    ctx.fillStyle = spec.tier === 5 ? 'rgba(244, 63, 94, 0.25)' : 'rgba(251, 191, 36, 0.22)';
+    ctx.fill();
+  }
+
+  ctx.beginPath();
+  ctx.arc(cx, cy - 2, r, 0, Math.PI * 2);
+  ctx.fillStyle = spec.color;
+  ctx.fill();
+  ctx.lineWidth = spec.tier >= 4 ? 3 : 2;
+  ctx.strokeStyle = tierCol;
+  ctx.stroke();
+
+  // 배지 텍스트
+  ctx.fillStyle = '#090d16';
+  ctx.font = `900 ${Math.max(10, Math.floor(tileSize * 0.17))}px -apple-system, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(spec.badge, cx, cy - 2);
+
+  // 이름
+  ctx.fillStyle = '#f8fafc';
+  ctx.font = `700 ${Math.max(9, Math.floor(tileSize * 0.145))}px -apple-system, sans-serif`;
+  ctx.fillText(spec.name.slice(0, 5), cx, cy + r + 7);
+
+  // 스킬 마나바
+  const mw = tileSize * 0.56;
+  const mRatio = Math.min(1, u.mana / spec.maxMana);
+  ctx.fillStyle = '#090d16';
+  ctx.fillRect(cx - mw / 2, cy - r - 6, mw, 3);
+  ctx.fillStyle = '#38bdf8';
+  ctx.fillRect(cx - mw / 2, cy - r - 6, mw * mRatio, 3);
+
+  // 잠금 아이콘
+  if (u.locked) {
+    ctx.font = '11px sans-serif';
+    ctx.fillText('🔒', cx + r - 2, cy - r + 2);
+  }
+}
+
+// =========================================================================
+// 9. 터치 & 드래그 인터랙션
+// =========================================================================
+canvas.addEventListener('pointerdown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const px = e.clientX - rect.left, py = e.clientY - rect.top;
+  const idx = getTileAtPoint(px, py);
+  if (idx >= 0 && state.grid[idx]) {
+    dragState = { active: true, fromIdx: idx, startX: px, startY: py, x: px, y: py, moved: false };
+  } else {
+    state.selectedIdx = -1;
+    updateInspector();
+  }
+});
+
+canvas.addEventListener('pointermove', (e) => {
+  if (!dragState.active) return;
+  const rect = canvas.getBoundingClientRect();
+  dragState.x = e.clientX - rect.left;
+  dragState.y = e.clientY - rect.top;
+  if (Math.hypot(dragState.x - dragState.startX, dragState.y - dragState.startY) > 9) {
+    dragState.moved = true;
+  }
+});
+
+function finishDrag(e) {
+  if (!dragState.active) return;
+  const from = dragState.fromIdx;
+  if (!dragState.moved) {
+    state.selectedIdx = from;
+    updateInspector();
+  } else {
+    const to = getTileAtPoint(dragState.x, dragState.y);
+    if (to >= 0 && to !== from) {
+      const uFrom = state.grid[from];
+      const uTo = state.grid[to];
+      if (uFrom && uTo && uFrom.id === uTo.id && UNIT_DB[uFrom.id].tier < 3 && !uFrom.locked && !uTo.locked) {
+        mergeUnits(from, to);
+      } else {
+        // 위치 스왑 또는 빈칸 이동
+        state.grid[to] = uFrom;
+        state.grid[from] = uTo;
+        state.selectedIdx = to;
+        onBoardChanged();
+      }
+    }
+  }
+  dragState.active = false;
+}
+canvas.addEventListener('pointerup', finishDrag);
+canvas.addEventListener('pointercancel', () => { dragState.active = false; });
+
+// =========================================================================
+// 10. UI · 모달 바인딩
+// =========================================================================
+function updateUI() {
+  document.getElementById('waveText').textContent = state.isBossWave ? `🔥 BOSS ${state.wave}` : `WAVE ${state.wave}`;
+  const sec = Math.max(0, Math.ceil(state.waveTimer));
+  document.getElementById('timerText').textContent = `00:${String(sec).padStart(2, '0')}`;
+
+  const cnt = state.enemies.length;
+  document.getElementById('enemyText').textContent = `해군 ${cnt} / ${MAX_ENEMIES}`;
+  document.getElementById('enemyBar').style.width = `${Math.min(100, (cnt / MAX_ENEMIES) * 100)}%`;
+
+  document.getElementById('berryText').textContent = state.berries;
+  document.getElementById('gemText').textContent = state.gems;
+  document.getElementById('summonCostText').textContent = `💰 ${state.summonCost} 베리`;
+
+  const bBtn = document.getElementById('btnBounty');
+  const bSub = document.getElementById('bountySubText');
+  if (state.bountyCooldown > 0) {
+    bBtn.classList.add('disabled');
+    bSub.textContent = `쿨타임 ${Math.ceil(state.bountyCooldown)}초`;
+  } else {
+    bBtn.classList.remove('disabled');
+    bSub.textContent = `즉시 호출 (+💎2)`;
+  }
+}
+
+function updateInspector() {
+  const idx = state.selectedIdx;
+  const u = idx >= 0 ? state.grid[idx] : null;
+  const titleEl = document.getElementById('insTitle');
+  const descEl = document.getElementById('insDesc');
+  const actEl = document.getElementById('insActions');
+
+  if (!u) {
+    titleEl.style.color = '#f8fafc';
+    titleEl.textContent = '타일의 동료를 터치하거나 드래그해 보세요';
+    descEl.textContent = '같은 동료 드래그: 상위 합성 | 다른 칸 드래그: 자리 이동';
+    actEl.style.display = 'none';
+    return;
+  }
+
+  const spec = UNIT_DB[u.id];
+  const atk = getUnitFinalAtk(u);
+  titleEl.style.color = TIER_INFO[spec.tier].color;
+  titleEl.textContent = `[${TIER_INFO[spec.tier].name}] ${spec.name} (공격력 ${atk})`;
+  descEl.textContent = spec.desc;
+  actEl.style.display = 'flex';
+
+  const dupIdx = state.grid.findIndex((other, i) => other && i !== idx && other.id === u.id && !other.locked);
+  const btnMerge = document.getElementById('btnMerge');
+  btnMerge.style.display = (spec.tier < 3 && !u.locked && dupIdx >= 0) ? 'inline-block' : 'none';
+  btnMerge.onclick = () => mergeUnits(dupIdx, idx);
+
+  const btnLock = document.getElementById('btnLock');
+  btnLock.className = u.locked ? 'u-btn locked' : 'u-btn lock';
+  btnLock.textContent = u.locked ? '🔒잠금중' : '🔓잠금';
+  btnLock.onclick = () => { u.locked = !u.locked; updateInspector(); };
+
+  const sellVal = spec.tier * 12;
+  const btnSell = document.getElementById('btnSell');
+  btnSell.textContent = `판매(+${sellVal})`;
+  btnSell.onclick = () => {
+    if (u.locked) { addFloatText(W / 2, gridY + 20, '잠금을 먼저 해제하세요!', '#fbbf24'); return; }
+    state.berries += sellVal;
+    state.grid[idx] = null;
+    state.selectedIdx = -1;
+    onBoardChanged();
+  };
+}
+
+function renderCraftAlertBar() {
+  const ready = getCraftableRecipes();
+  const bar = document.getElementById('craftAlertBar');
+  const badge = document.getElementById('recipeBadge');
+
+  if (ready.length > 0) {
+    badge.style.display = 'flex';
+    badge.textContent = ready.length;
+  } else {
+    badge.style.display = 'none';
+  }
+
+  bar.innerHTML = ready.map(r => {
+    const spec = UNIT_DB[r.result];
+    return `<button class="craft-chip" onclick="executeRecipe('${r.result}')">⚡ 조합 가능: [${TIER_INFO[spec.tier].name}] ${spec.name}</button>`;
+  }).join('');
+}
+
+function openRecipeModal() {
+  const counts = {};
+  state.grid.forEach(u => { if (u) counts[u.id] = (counts[u.id] || 0) + 1; });
+
+  const body = document.getElementById('recipeListBody');
+  body.innerHTML = RECIPES.map(r => {
+    const res = UNIT_DB[r.result];
+    const canCraft = r.materials.every(m => (counts[m] || 0) >= 1);
+    const ingHtml = r.materials.map(m => {
+      const ms = UNIT_DB[m];
+      const owned = (counts[m] || 0) >= 1;
+      return `<span class="ing-pill ${owned ? 'owned' : ''}">${owned ? '✓ ' : ''}[${TIER_INFO[ms.tier].name}] ${ms.name}</span>`;
+    }).join('');
+    return `
+      <div class="recipe-card ${canCraft ? 'ready' : ''}">
+        <div class="recipe-top">
+          <div>
+            <div style="font-weight:900; color:${TIER_INFO[res.tier].color}">[${TIER_INFO[res.tier].name}] ${res.name}</div>
+            <div style="font-size:11px; color:#94a3b8; margin-top:2px;">${res.desc}</div>
+          </div>
+          <button class="craft-do-btn" ${canCraft ? '' : 'disabled'} onclick="executeRecipe('${r.result}')">조합</button>
+        </div>
+        <div class="ing-list">${ingHtml}</div>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('recipeModal').classList.add('open');
+}
+
+function openUpgModal() {
+  const u = state.upgrades;
+  const cCost = 30 + u.commonAtk * 15;
+  const eCost = 50 + u.epicAtk * 25;
+  const mGem = 1 + Math.floor(u.mythicAtk / 2);
+  const lCost = 60 + u.luckLv * 45;
+
+  const body = document.getElementById('upgListBody');
+  body.innerHTML = `
+    <div class="upg-row">
+      <div>
+        <div style="font-weight:800;">일반 · 희귀 공격력 Lv.${u.commonAtk + 1}</div>
+        <div style="font-size:11px; color:#94a3b8;">1~2티어 동료 공격력 +22%</div>
+      </div>
+      <button class="craft-do-btn" onclick="buyUpg('common')">💰 ${cCost}</button>
+    </div>
+    <div class="upg-row">
+      <div>
+        <div style="font-weight:800; color:#c084fc;">영웅 공격력 Lv.${u.epicAtk + 1}</div>
+        <div style="font-size:11px; color:#94a3b8;">3티어 동료 공격력 +25%</div>
+      </div>
+      <button class="craft-do-btn" onclick="buyUpg('epic')">💰 ${eCost}</button>
+    </div>
+    <div class="upg-row">
+      <div>
+        <div style="font-weight:800; color:#fbbf24;">신화 · 초월 패기 강화 Lv.${u.mythicAtk + 1}</div>
+        <div style="font-size:11px; color:#94a3b8;">4~5티어 동료 공격력 +30%</div>
+      </div>
+      <button class="craft-do-btn" style="background:#38bdf8;" onclick="buyUpg('mythic')">💎 ${mGem}</button>
+    </div>
+    <div class="upg-row">
+      <div>
+        <div style="font-weight:800; color:#4ade80;">고급 동료 소환 확률 Lv.${u.luckLv + 1} (최대 5)</div>
+        <div style="font-size:11px; color:#94a3b8;">베리 소환 시 희귀·영웅 등장률 증가</div>
+      </div>
+      <button class="craft-do-btn" ${u.luckLv >= 5 ? 'disabled' : ''} onclick="buyUpg('luck')">${u.luckLv >= 5 ? 'MAX' : '💰 ' + lCost}</button>
+    </div>
+  `;
+  document.getElementById('upgModal').classList.add('open');
+}
+
+window.buyUpg = function(kind) {
+  const u = state.upgrades;
+  if (kind === 'common') {
+    const cost = 30 + u.commonAtk * 15;
+    if (state.berries < cost) return sfxFail();
+    state.berries -= cost; u.commonAtk++;
+  } else if (kind === 'epic') {
+    const cost = 50 + u.epicAtk * 25;
+    if (state.berries < cost) return sfxFail();
+    state.berries -= cost; u.epicAtk++;
+  } else if (kind === 'mythic') {
+    const cost = 1 + Math.floor(u.mythicAtk / 2);
+    if (state.gems < cost) return sfxFail();
+    state.gems -= cost; u.mythicAtk++;
+  } else if (kind === 'luck' && u.luckLv < 5) {
+    const cost = 60 + u.luckLv * 45;
+    if (state.berries < cost) return sfxFail();
+    state.berries -= cost; u.luckLv++;
+  }
+  sfxSummon();
+  updateUI();
+  updateInspector();
+  openUpgModal();
+};
+
+window.closeModals = function() {
+  document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.remove('open'));
+};
+
+function triggerEndModal(title, msg) {
+  document.getElementById('resultTitle').textContent = title;
+  document.getElementById('resultMsg').textContent = msg;
+  document.getElementById('resultModal').classList.add('open');
+}
+
+window.restartGame = function() {
+  closeModals();
+  initGameState();
+};
+
+// 버튼 이벤트 연결
+document.getElementById('btnSummon').onclick = summonUnit;
+document.getElementById('btnGamble').onclick = gambleUnit;
+document.getElementById('btnBounty').onclick = summonBountyBoss;
+document.getElementById('btnOpenRecipe').onclick = openRecipeModal;
+document.getElementById('btnOpenUpg').onclick = openUpgModal;
+
+document.getElementById('speedBtn').onclick = (e) => {
+  state.gameSpeed = state.gameSpeed === 1 ? 2 : 1;
+  e.target.textContent = `${state.gameSpeed}x`;
+  e.target.classList.toggle('active', state.gameSpeed === 2);
+};
+document.getElementById('sfxBtn').onclick = (e) => {
+  sfxEnabled = !sfxEnabled;
+  e.target.textContent = sfxEnabled ? '🔊' : '🔇';
+  e.target.classList.toggle('active', sfxEnabled);
+};
+
+// =========================================================================
+// 11. 메인 루프 실행
+// =========================================================================
+let lastTime = performance.now();
+function loop(now) {
+  const rawDt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+  updateSimulation(rawDt * state.gameSpeed);
+  updateUI();
+  drawGame();
+  requestAnimationFrame(loop);
+}
+
+resizeCanvas();
+initGameState();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
